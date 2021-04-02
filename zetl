@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+
+# Source our templates
+. .templates.sh
+
+## Filenames and paths
+SCRP_NME="$(basename "${0}")"
+JRNL_PTH="journal/"
+WORK_DIR="work/"
+
+## Card titles
+JRNL_TTL="$(date +%y-%m-%d)"
+ZETL_TTL=$(date +"%Y%m%d%H%M")
+
+_print_help() {
+  cat <<HEREDOC
+Helper script to generate a zettelkasten card
+Usage:
+  ${SCRP_NME} [<arguments>]
+
+Options:
+  -h | --help     Show this screen.
+  -d | --daily    Daily tasks in Journal/YYYY/MMM
+  -j | --journal  Journal card  in Journal/YYYY/MMM
+  -w | --work     work created under Work
+  -n | --new      general card created in main zet dir
+  -c | --clean    formats all *.md files using prettier
+HEREDOC
+}
+
+_lowercase_titles() {
+  find . -iname "*.md" -exec rename 'y/[A-Z]/[a-z]/' {} \;
+}
+
+# Clean zettel - runs prettier on all files
+_cz() {
+  find . -type f -iname '*.md' \
+    -exec npx prettier --write {} +
+  _lowercase_titles
+}
+
+
+
+_populate_open() {
+  # populate the card, open it in vi
+  echo -e "$META_STR\n$TEMPLATE" >"$CARD"
+  vi +star "$CARD"
+}
+
+_clean_title () {
+  echo "$*" | sed 's/ /_/g' | tr '[:upper:]' '[:lower:]'
+}
+
+_tag_counts () {
+  taglist=$(grep -ioh "#[0-9a-Z\-]*\b" *.md )
+  taglist=$(echo $taglist | tr '[:upper:]' '[:lower:]'| uniq )
+  echo $taglist
+  for i in $taglist
+    do printf "%s $i\t"; grep -ir "$i" *.md | wc -l
+  done
+}
+
+
+###### OPTION PARSING ##########################################
+
+OPTIONS=chdjwn
+LONGOPTS=clean,help,daily,journal,work,new
+! PARSED=$(getopt --options=$OPTIONS --longoptions=$LONGOPTS --name "$0" -- "$@")
+
+if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
+  # e.g. return value is 1
+  #  then getopt has complained about wrong arguments to stdout
+  exit 2
+fi
+# read getopt’s output this way to handle the quoting right:
+eval set -- "$PARSED"
+
+
+if [ "$1" == '--' ]; then
+  ## no options passed = help message
+  _print_help
+else
+  while true; do
+    case "$1" in
+    -d | --daily)
+      TAGS="Daily"
+      TITLE="$JRNL_TTL - DAILY"
+      TEMPLATE=$(daily_template)
+      META_STR="$(meta)"
+      CARD="$JRNL_PTH/$JRNL_TTL.daily.md"
+      shift
+      ;;
+    -j | --journal)
+      TAGS="journal"
+      TITLE=$JRNL_TTL
+      TEMPLATE=$(journal_template)
+      META_STR="$(meta)"
+      CARD="$JRNL_PTH$TITLE.md"
+      _populate_open
+      shift
+      ;;
+    -w | --work)
+      shift 
+      TAGS="work"
+      title="$*"
+      TITLE=${title#??}   
+      CARD="$WORK_DIR$ZETL_TTL-$(_clean_title "$TITLE").md"
+      TEMPLATE=$(new_template)
+      META_STR="$(meta)"
+      _populate_open
+      ;;
+    -c | --clean)
+      _cz
+      shift
+      ;;
+    -n | --new)
+      shift 
+      title="$*"
+      TITLE=${title#??}   
+      CARD="$ZETL_TTL-$(_clean_title "$TITLE").md"
+      TEMPLATE=$(new_template)
+      META_STR="$(meta)"
+      _populate_open
+      ;;
+    -h | --help)
+      _print_help
+      shift
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      _print_help
+      ;;
+    esac
+  done
+fi
