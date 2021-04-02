@@ -73,3 +73,13 @@ work_template() {
 
 HEREDOC
 }
+
+tags_template() {
+  cat << HEREDOC
+  
+  # $TITLE
+
+  $TABLE
+
+HEREDOC
+}

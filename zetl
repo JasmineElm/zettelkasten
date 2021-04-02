@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 # Source our templates
+# shellcheck disable=SC1091
 . .templates.sh
 
 ## Filenames and paths
@@ -28,43 +29,66 @@ Options:
 HEREDOC
 }
 
-_lowercase_titles() {
-  find . -iname "*.md" -exec rename 'y/[A-Z]/[a-z]/' {} \;
+_clean_title() {
+  echo "$*" | sed 's/ /_/g' | tr '[:upper:]' '[:lower:]'
 }
+
+_prettify_card() {
+  npx prettier --write "$CARD"
+}
+
+export -f _prettify_card
+export -f _clean_title
+
+_lowercase_titles() {
+  find . -iname "*.md" -exec bash -c mv {} _clean_title {} \;
+}
+
 
 # Clean zettel - runs prettier on all files
 _cz() {
   find . -type f -iname '*.md' \
-    -exec npx prettier --write {} +
+    -exec bash -c _prettify_card {} +
   _lowercase_titles
 }
 
-
-
-_populate_open() {
-  # populate the card, open it in vi
+_populate_card() {
   echo -e "$META_STR\n$TEMPLATE" >"$CARD"
-  vi +star "$CARD"
 }
 
-_clean_title () {
-  echo "$*" | sed 's/ /_/g' | tr '[:upper:]' '[:lower:]'
+_edit_card() {
+    vi "+normal G$" +startinsert! "$CARD"
 }
 
-_tag_counts () {
-  taglist=$(grep -ioh "#[0-9a-Z\-]*\b" *.md )
-  taglist=$(echo $taglist | tr '[:upper:]' '[:lower:]'| uniq )
-  echo $taglist
-  for i in $taglist
-    do printf "%s $i\t"; grep -ir "$i" *.md | wc -l
+
+
+_populate_edit_prettify() {
+  _populate_card
+  _edit_card
+  _prettify_card
+}
+
+
+# a '#' followed by a letter, number or em-dash
+# should be consifered a tag.
+# convert to lower case, ignore duplicates
+_hashed_tags() {
+  grep -roh "#\w[a-Z0-9\-]*" ./*.md | tr '[:upper:]' '[:lower:]' | sort -u
+}
+
+# badly formatted markdown table; prettier will clean this.
+_make_table() {
+  tags=$(_hashed_tags)
+  printf "| tag \t| count|\n|:---|:---|\n"
+  for tag in $tags; do
+    count=$(grep -ir "$tag" ./*.md | wc -l)
+    printf "%s| $tag \t| $count |\n "
   done
 }
-
-
 ###### OPTION PARSING ##########################################
 
-OPTIONS=chdjwn
-LONGOPTS=clean,help,daily,journal,work,new
+OPTIONS=chdjwnt
+LONGOPTS=clean,tags,help,daily,journal,work,new
 ! PARSED=$(getopt --options=$OPTIONS --longoptions=$LONGOPTS --name "$0" -- "$@")
 
 if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
@@ -74,7 +98,6 @@ if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
 fi
 # read getopt’s output this way to handle the quoting right:
 eval set -- "$PARSED"
-
 
 if [ "$1" == '--' ]; then
   ## no options passed = help message
@@ -96,31 +119,43 @@ else
       TEMPLATE=$(journal_template)
       META_STR="$(meta)"
       CARD="$JRNL_PTH$TITLE.md"
-      _populate_open
+      _populate_edit_prettify
       shift
       ;;
     -w | --work)
-      shift 
+      shift
       TAGS="work"
       title="$*"
-      TITLE=${title#??}   
+      TITLE=${title#??}
       CARD="$WORK_DIR$ZETL_TTL-$(_clean_title "$TITLE").md"
       TEMPLATE=$(new_template)
       META_STR="$(meta)"
-      _populate_open
+      _populate_card
       ;;
     -c | --clean)
       _cz
       shift
       ;;
     -n | --new)
-      shift 
+      shift
       title="$*"
-      TITLE=${title#??}   
+      TITLE=${title#??}
       CARD="$ZETL_TTL-$(_clean_title "$TITLE").md"
       TEMPLATE=$(new_template)
       META_STR="$(meta)"
-      _populate_open
+      _populate_edit_prettify
+      ;;
+    -t | --tags)
+      shift
+      TAGS="tags"
+      TITLE="TAGS"
+      CARD="$TITLE.markdown"
+      
+      TEMPLATE="$(tags_template)"
+      META_STR="$(meta)"
+      _populate_card
+      _prettify_card
+
       ;;
     -h | --help)
       _print_help
