@@ -1,9 +1,5 @@
 #!/usr/bin/env bash
 
-# Source our templates
-# shellcheck disable=SC1091
-. .templates.sh
-
 ## Filenames and paths
 SCRP_NME="$(basename "${0}")"
 JRNL_PTH="journal/"
@@ -14,7 +10,7 @@ JRNL_TTL="$(date +%y-%m-%d)"
 ZETL_TTL=$(date +"%Y%m%d%H%M")
 
 _print_help() {
-  cat <<HEREDOC
+  printf "%s
 Helper script to generate a zettelkasten card
 Usage:
   ${SCRP_NME} [<arguments>]
@@ -26,14 +22,112 @@ Options:
   -w | --work     work created under Work
   -n | --new      general card created in main zet dir
   -c | --clean    formats all *.md files using prettier
-HEREDOC
+"
 }
+
+# =======================================================
+#     TEMPLATES
+# =======================================================
+
+meta() {
+  DATE_STR=$(date)
+  printf "%s---
+title: $TITLE
+date: $DATE_STR
+aliases: 
+tags: $TAGS
+---
+"
+}
+
+journal_template() {
+  TAGS="journal"
+  TITLE=$JRNL_TTL
+  META=$(meta "$TITLE" "$DATE_STR" "$TAGS")
+  YESTERDAY=$(date --date="yesterday" +%y-%m-%d)
+  TOMORROW=$(date --date="tomorrow" +%y-%m-%d)
+  printf "%s$META
+
+## $TITLE
+
+### What Happened
+
+
+
+### What Went Well
+
+
+
+### What Didn't Go Well
+
+![Daily]($JRNL_TTL.daily.md#Tasks)
+
+![Morning Pages]($JRNL_TTL.mp.md#Morning%%20Notes)
+
+[Yesterday]($YESTERDAY.md) <-- --> [Tomorrow]($TOMORROW.md)"
+}
+
+daily_template() {
+  TAGS="Daily"
+  TITLE="$JRNL_TTL - DAILY"
+  CARD_COUNT="$(_count_cards)"
+  META=$(meta)
+  printf "%s$META
+
+# $TITLE
+
+_Card Count: $CARD_COUNT _
+
+![Active Goals](../../../Active%20Goals.md#This%%20Week)
+
+## Tasks
+
+"
+}
+
+new_template() {
+  META=$(meta)
+  printf "%s$META
+  
+  # $TITLE
+
+"
+}
+
+work_template() {
+  META=$(meta)
+  TAGS="work"
+  printf "%s$META
+  
+  # $TITLE
+
+"
+}
+
+tags_template() {
+  TAGS="tags"
+  TITLE="TAGS"
+  TABLE="$(_make_table)"
+  printf "%s
+  
+  # $TITLE
+
+  Tag frequency counts as at $(date)
+
+  $TABLE
+
+"
+}
+
+# =======================================================
+#     FUNCTIONS
+# =======================================================
 
 _clean_title() {
   echo "$*" | sed 's/ /_/g' | tr '[:upper:]' '[:lower:]'
 }
 _populate_card() {
-  echo -e "$META_STR\n$TEMPLATE" >"$1"
+  echo -e "$TEMPLATE" >"$1"
 }
 
 _edit_card() {
@@ -50,11 +144,15 @@ _populate_edit_prettify_card() {
   _prettify_card "$_CARD"
 }
 
-_prettify_all() {
+function _count_cards() {
+  find . -iname "*.md" | wc -l
+}
+
+function _prettify_all() {
   npx prettier --write ./**/*.md
 }
 
-_fix_filename() {
+function _fix_filename() {
   for file in {**,.}/*.md; do
     mv -n "$file" "$(_clean_title "$file")"
   done
@@ -63,7 +161,7 @@ _fix_filename() {
 # Clean zettel
 # - prettifies files
 # lowercases, and removes spaces from filenames
-_cz() {
+function _cz() {
   _prettify_all
   _fix_filename
 }
@@ -72,7 +170,7 @@ _cz() {
 # should be consifered a tag.
 # convert to lower case, ignore duplicates
 _hashed_tags() {
-  grep -roh "#\w[a-Z0-9\-]*" ./*.md | tr '[:upper:]' '[:lower:]' | sort -u
+  grep -roh "#\w[a-Z0-9\-]*" {**,.}/*.md | tr '[:upper:]' '[:lower:]' | sort -u
 }
 
 # badly formatted markdown table; prettier will clean this.
@@ -80,7 +178,7 @@ _make_table() {
   tags=$(_hashed_tags)
   printf "| tag \t| count|\n|:---|:---|\n"
   for tag in $tags; do
-    count=$(grep -ir "$tag" ./*.md | wc -l)
+    count=$(grep -ir "$tag" {**,.}/*.md | wc -l)
     printf "%s| $tag \t| $count |\n "
   done
 }
@@ -89,7 +187,7 @@ _network_tags() {
   ## for future use - filename & title for each tag
   tags=$(_hashed_tags)
   for tag in $tags; do
-    for match in $(grep -irl "$tag" ./*.md); do
+    for match in $(grep -irl "$tag" {**,.}/*.md); do
       title=$(grep "^# [a-Z0-9]*" "$match" | head -1)
       printf "%s$tag, $match, $title \n"
     done
@@ -112,35 +210,30 @@ eval set -- "$PARSED"
 
 if [ "$1" == '--' ]; then
   ## no options passed = help message
-  _print_help
+  # _print_help
+  _network_tags
 else
   while true; do
     case "$1" in
     -d | --daily)
-      TAGS="Daily"
-      TITLE="$JRNL_TTL - DAILY"
       TEMPLATE=$(daily_template)
-      META_STR="$(meta)"
       CARD="$JRNL_PTH/$JRNL_TTL.daily.md"
+      _populate_edit_prettify_card "$CARD"
       shift
       ;;
     -j | --journal)
-      TAGS="journal"
-      TITLE=$JRNL_TTL
       TEMPLATE=$(journal_template)
-      META_STR="$(meta)"
-      CARD="$JRNL_PTH$TITLE.md"
+      CARD="$JRNL_PTH$JRNL_TTL.md"
       _populate_edit_prettify_card "$CARD"
       shift
       ;;
     -w | --work)
       shift
-      TAGS="work"
+
       title="$*"
-      TITLE=${title#??}
+      TITLE=${title#???}
       CARD="$WORK_DIR$ZETL_TTL-$(_clean_title "$TITLE").md"
       TEMPLATE=$(new_template)
-      META_STR="$(meta)"
       _populate_edit_prettify_card "$CARD"
       ;;
     -c | --clean)
@@ -153,16 +246,14 @@ else
       TITLE=${title#??}
       CARD="$ZETL_TTL-$(_clean_title "$TITLE").md"
       TEMPLATE=$(new_template)
-      META_STR="$(meta)"
+      # META_STR="$(meta)"
       _populate_edit_prettify_card "$CARD"
       ;;
     -t | --tags)
       shift
-      TAGS="tags"
-      TITLE="TAGS"
+      TITLE='TAGS'
       CARD="$TITLE.markdown"
       TEMPLATE="$(tags_template)"
-      META_STR="$(meta)"
       _populate_card $CARD
       _prettify_card $CARD
       ;;
