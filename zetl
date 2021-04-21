@@ -138,10 +138,10 @@ _prettify_card() {
 }
 
 _populate_edit_prettify_card() {
-  local _CARD="$1"
-  _populate_card "$_CARD"
-  _edit_card "$_CARD"
-  _prettify_card "$_CARD"
+  local             _CARD="$1"
+  _populate_card  "$_CARD"
+  _edit_card      "$_CARD"
+  _prettify_card  "$_CARD"
 }
 
 function _count_cards() {
@@ -153,14 +153,13 @@ function _prettify_all() {
 }
 
 function _fix_filename() {
+  # filenames should be lowercase and have underscores
+  # instead of sapces
   for file in {**,.}/*.md; do
     mv -n "$file" "$(_clean_title "$file")"
   done
 }
 
-# Clean zettel
-# - prettifies files
-# lowercases, and removes spaces from filenames
 function _cz() {
   _prettify_all
   _fix_filename
