@@ -152,17 +152,17 @@ function _prettify_all() {
   npx prettier --write ./**/*.md
 }
 
-function _fix_filename() {
-  # filenames should be lowercase and have underscores
-  # instead of sapces
-  for file in {**,.}/*.md; do
-    mv -n "$file" "$(_clean_title "$file")"
-  done
-}
+# function _fix_filename() {
+#   # filenames should be lowercase and have underscores
+#   # instead of sapces
+#   for file in {**,.}/*.md; do
+#     mv -n "$file" "$(_clean_title "$file")"
+#   done
+# }
 
 function _cz() {
   _prettify_all
-  _fix_filename
+  # _fix_filename
 }
 
 # a '#' followed by a letter, number or em-dash
