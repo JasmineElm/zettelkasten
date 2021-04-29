@@ -133,12 +133,13 @@ _populate_card() {
 _edit_card() {
   vi "+normal G$" +startinsert! "$1"
 }
+
 _prettify_card() {
-  npx prettier --write "$1"
+  yarnpkg prettier --write "$1"
 }
 
 _populate_edit_prettify_card() {
-  local             _CARD="$1"
+  local    _CARD="$1"
   _populate_card  "$_CARD"
   _edit_card      "$_CARD"
   _prettify_card  "$_CARD"
@@ -148,21 +149,8 @@ function _count_cards() {
   find . -iname "*.md" | wc -l
 }
 
-function _prettify_all() {
-  npx prettier --write ./**/*.md
-}
-
-# function _fix_filename() {
-#   # filenames should be lowercase and have underscores
-#   # instead of sapces
-#   for file in {**,.}/*.md; do
-#     mv -n "$file" "$(_clean_title "$file")"
-#   done
-# }
-
 function _cz() {
-  _prettify_all
-  # _fix_filename
+  _prettify_card './**/*.md' 
 }
 
 # a '#' followed by a letter, number or em-dash
@@ -193,7 +181,9 @@ _network_tags() {
   done
 }
 
-###### OPTION PARSING ##########################################
+# =======================================================
+#     OPTION PARSING
+# =======================================================
 
 OPTIONS=chdjwnt
 LONGOPTS=clean,tags,help,daily,journal,work,new
@@ -201,7 +191,7 @@ LONGOPTS=clean,tags,help,daily,journal,work,new
 
 if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
   # e.g. return value is 1
-  #  then getopt has complained about wrong arguments to stdout
+  # getopt has complained about wrong arguments to stdout
   exit 2
 fi
 # read getopt’s output this way to handle the quoting right:
@@ -209,7 +199,6 @@ eval set -- "$PARSED"
 
 if [ "$1" == '--' ]; then
   ## no options passed = help message
-  # _print_help
   _network_tags
 else
   while true; do
