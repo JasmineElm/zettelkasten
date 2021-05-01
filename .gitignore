@@ -5,10 +5,7 @@
 *.png
 *.bib
 *.swp
-.prettierrc
-.remarkrc.js
-.templates.sh
 *.vscode
 *.code-workspace
-node_modules/
-
+.trash/
+node_modules
