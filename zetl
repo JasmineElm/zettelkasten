@@ -4,6 +4,8 @@
 SCRP_NME="$(basename "${0}")"
 JRNL_PTH="journal/"
 WORK_DIR="work/"
+IMGE_DIR="attachments/"
+BKUP_SRV="dropbox"
 
 ## Card titles
 JRNL_TTL="$(date +%y-%m-%d)"
@@ -52,7 +54,17 @@ journal_template() {
 
 ### What Happened
 
+<!--
++ Who was there?
++ Who said what
 
++ Why did I respond in that way
++ How did eveyone feel as a result
++ How could I have acted differently
+
++ What could have changed the outcomes?
++ What will I do next time?
+-->
 
 ### What Went Well
 
@@ -139,7 +151,8 @@ _prettify_card() {
 }
 
 _populate_edit_prettify_card() {
-  local    _CARD="$1"
+  local     _CARD="$1"
+  echo "$_CARD"
   _populate_card  "$_CARD"
   _edit_card      "$_CARD"
   _prettify_card  "$_CARD"
@@ -149,8 +162,16 @@ function _count_cards() {
   find . -iname "*.md" | wc -l
 }
 
+function _minify_png() {
+  rclone copy "$IMGE_DIR" "$BKUP_SRV":"$IMGE_DIR" \
+    && pngquant "$IMGE_DIR"*.png --skip-if-larger --ext .png --force
+}
+  
+
+
 function _cz() {
-  _prettify_card './**/*.md' 
+  _prettify_card './**/*.md'
+ _minify_png 
 }
 
 # a '#' followed by a letter, number or em-dash
@@ -174,11 +195,9 @@ _network_tags() {
   ## for future use - filename & title for each tag
   tags=$(_hashed_tags)
   for tag in $tags; do
-    for match in $(grep -irl "$tag" {**,.}/*.md); do
       title=$(grep "^# [a-Z0-9]*" "$match" | head -1)
       printf "%s$tag, $match, $title \n"
     done
-  done
 }
 
 # =======================================================
@@ -259,3 +278,4 @@ else
     esac
   done
 fi
+#!/usr/bin/env bash

@@ -14,5 +14,7 @@ pushit() {
 
 }
 
-[ $out_of_sync -eq 0 ] || $(pushit)
+## no changes OR sync-it
+
+[ "$out_of_sync" -eq 0 ] || pushit
 
