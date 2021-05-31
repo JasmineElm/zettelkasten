@@ -4,8 +4,7 @@
 SCRP_NME="$(basename "${0}")"
 JRNL_PTH="journal/"
 WORK_DIR="work/"
-IMGE_DIR="attachments/"
-BKUP_SRV="dropbox"
+BKUP_SRV="google"
 
 ## Card titles
 JRNL_TTL="$(date +%y-%m-%d)"
@@ -46,7 +45,7 @@ journal_template() {
   TAGS="journal"
   TITLE=$JRNL_TTL
   META=$(meta "$TITLE" "$DATE_STR" "$TAGS")
-  YESTERDAY=$(date --date="yesterday" +%y-%m-%d)
+  #  YESTERDAY=$(date --date="yesterday" +%y-%m-%d)
   TOMORROW=$(date --date="tomorrow" +%y-%m-%d)
   printf "%s$META
 
@@ -54,29 +53,16 @@ journal_template() {
 
 ### What Happened
 
-<!--
-+ Who was there?
-+ Who said what
 
-+ Why did I respond in that way
-+ How did eveyone feel as a result
-+ How could I have acted differently
+### Cards Since Yesterday
 
-+ What could have changed the outcomes?
-+ What will I do next time?
--->
+$(_cards_since_x)
 
-### What Went Well
+$(_daily_exists)
 
+$(_mp_exists)
 
-
-### What Didn't Go Well
-
-![Daily]($JRNL_TTL.daily.md#Tasks)
-
-![Morning Pages]($JRNL_TTL.mp.md#Morning%%20Notes)
-
-[Yesterday]($YESTERDAY.md) <-- --> [Tomorrow]($TOMORROW.md)"
+[Yesterday]($(_last_journal)) <-- --> [Tomorrow]($TOMORROW.md)"
 }
 
 daily_template() {
@@ -88,7 +74,7 @@ daily_template() {
 
 # $TITLE
 
-_Card Count: $CARD_COUNT _
+_Card Count: $CARD_COUNT\_
 
 ![Active Goals](../../../Active%20Goals.md#This%%20Week)
 
@@ -116,24 +102,50 @@ work_template() {
 "
 }
 
-tags_template() {
-  TAGS="tags"
-  TITLE="TAGS"
-  TABLE="$(_make_table)"
-  printf "%s
-  
-  # $TITLE
-
-  Tag frequency counts as at $(date)
-
-  $TABLE
-
-"
-}
-
 # =======================================================
 #     FUNCTIONS
 # =======================================================
+
+_daily_exists() {
+  if [ -f "./journal/$JRNL_TTL.daily.md" ]; then
+    echo '+ [Daily]('"$JRNL_TTL"'.daily.md#Tasks)'
+  fi
+}
+
+_mp_exists() {
+  if [ -f "./journal/$JRNL_TTL.mp.md" ]; then
+    echo '+ [Morning Pages]('"$JRNL_TTL"'.mp.md#Morning%%20Notes)'
+  fi
+}
+
+## list latest cards for Journal entries
+_last_journal() {
+  unset -v latest
+  for file in "$JRNL_PTH"/[0-9][0-9]-[0-9][0-9]-[0-9][0-9].md; do
+    [[ $file -nt $latest ]] && latest=$file
+  done
+  echo "${latest##*/}"
+}
+
+_mins_since_last_journal() {
+  lst_fle="$(_last_journal)"
+  mslj=$(((($(date +%s) - $(date +%s -r "$JRNL_PTH$lst_fle"))) / 60))
+  echo $mslj
+}
+
+_cards_since_x() {
+  lms=$(_mins_since_last_journal)
+  readarray -d '' array < <(find . -not -path "./journal*" -mmin -"$lms" -iname '*.md' -print0)
+  for i in "${array[@]}"; do
+    echo "+ [$i]($i)"
+  done
+}
+
+_binary_exists() {
+  if [ "$(command -v "$1" | wc -l)" -eq 0 ]; then
+    echo "cannot find $1 ... Exiting" && exit 1
+  fi
+}
 
 _clean_title() {
   echo "$*" | sed 's/ /_/g' | tr '[:upper:]' '[:lower:]'
@@ -147,65 +159,58 @@ _edit_card() {
 }
 
 _prettify_card() {
+  _binary_exists yarnpkg
   yarnpkg prettier --write "$1"
 }
 
 _populate_edit_prettify_card() {
-  local     _CARD="$1"
+  local _CARD="$1"
   echo "$_CARD"
-  _populate_card  "$_CARD"
-  _edit_card      "$_CARD"
-  _prettify_card  "$_CARD"
+  _populate_card "$_CARD"
+  _edit_card "$_CARD"
+  _prettify_card "$_CARD"
 }
 
-function _count_cards() {
+_count_cards() {
   find . -iname "*.md" | wc -l
 }
 
-function _minify_png() {
-  rclone copy "$IMGE_DIR" "$BKUP_SRV":"$IMGE_DIR" \
-    && pngquant "$IMGE_DIR"*.png --skip-if-larger --ext .png --force
+_backup_zetl() {
+  _binary_exists rclone
+  rclone copy . "$BKUP_SRV:zetlkasten"
 }
-  
 
+_minify_png() {
+  _binary_exists pngquant
+  pngquant ./**/*.png --skip-if-larger --ext .png --force
+}
 
-function _cz() {
+_cz() {
+  _backup_zetl
   _prettify_card './**/*.md'
- _minify_png 
+  _minify_png
 }
 
 # a '#' followed by a letter, number or em-dash
 # should be consifered a tag.
 # convert to lower case, ignore duplicates
-_hashed_tags() {
-  grep -roh "#\w[a-Z0-9\-]*" {**,.}/*.md | tr '[:upper:]' '[:lower:]' | sort -u
-}
+#
 
-# badly formatted markdown table; prettier will clean this.
-_make_table() {
-  tags=$(_hashed_tags)
-  printf "| tag \t| count|\n|:---|:---|\n"
-  for tag in $tags; do
-    count=$(grep -ir "$tag" {**,.}/*.md | wc -l)
-    printf "%s| $tag \t| $count |\n "
-  done
-}
-
-_network_tags() {
-  ## for future use - filename & title for each tag
-  tags=$(_hashed_tags)
-  for tag in $tags; do
-      title=$(grep "^# [a-Z0-9]*" "$match" | head -1)
-      printf "%s$tag, $match, $title \n"
-    done
-}
+# _network_tags() {
+#   ## for future use - filename & title for each tag
+#   tags=$(_hashed_tags)
+#   for tag in $tags; do
+#     title=$(grep "^# [a-Z0-9]*" "$match" | head -1)
+#     printf "%s$tag, $match, $title \n"
+#   done
+# }
 
 # =======================================================
 #     OPTION PARSING
 # =======================================================
 
-OPTIONS=chdjwnt
-LONGOPTS=clean,tags,help,daily,journal,work,new
+OPTIONS=chdjwntm
+LONGOPTS=clean,tags,help,daily,journal,work,new,morning
 ! PARSED=$(getopt --options=$OPTIONS --longoptions=$LONGOPTS --name "$0" -- "$@")
 
 if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
@@ -256,13 +261,11 @@ else
       # META_STR="$(meta)"
       _populate_edit_prettify_card "$CARD"
       ;;
-    -t | --tags)
+    -m | --morning)
+      CARD="$JRNL_PTH$JRNL_TTL.mp.md"
+      _populate_edit_prettify_card "$CARD"
+      # TODO: add writing prompt logic
       shift
-      TITLE='TAGS'
-      CARD="$TITLE.markdown"
-      TEMPLATE="$(tags_template)"
-      _populate_card $CARD
-      _prettify_card $CARD
       ;;
     -h | --help)
       _print_help
@@ -278,4 +281,3 @@ else
     esac
   done
 fi
-#!/usr/bin/env bash
