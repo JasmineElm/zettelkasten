@@ -2,9 +2,10 @@
 
 ## Filenames and paths
 SCRP_NME="$(basename "${0}")"
-JRNL_PTH="journal/"
-WORK_DIR="work/"
-BKUP_SRV="google"
+JRNL_PTH="journal/" ## directory for 'journal' cards
+WORK_DIR="work/"    ## directory for 'work' cards
+BKUP_SRV="google"   ## backup to a service using rclone.
+NORM_LOC="Preston"  ## where are you normally located?
 
 ## Card titles
 JRNL_TTL="$(date +%y-%m-%d)"
@@ -51,6 +52,8 @@ journal_template() {
 
 ## $TITLE
 
+$(_weather_block)
+
 ### What Happened
 
 
@@ -76,9 +79,10 @@ daily_template() {
 
 _Card Count: $CARD_COUNT\_
 
-![Active Goals](../../../Active%20Goals.md#This%%20Week)
+![Active Goals](../active_goals.md#This%%20Week)
 
 ## Tasks
+
 
 "
 }
@@ -118,9 +122,12 @@ _mp_exists() {
   fi
 }
 
+_weather_block() {
+  curl wttr.in?format="%l\n%C+%t\nSunrise+%S\nSunset+%s\n+%m\n"
+}
+
 ## list latest cards for Journal entries
 _last_journal() {
-  unset -v latest
   for file in "$JRNL_PTH"/[0-9][0-9]-[0-9][0-9]-[0-9][0-9].md; do
     [[ $file -nt $latest ]] && latest=$file
   done
@@ -190,20 +197,6 @@ _cz() {
   _prettify_card './**/*.md'
   _minify_png
 }
-
-# a '#' followed by a letter, number or em-dash
-# should be consifered a tag.
-# convert to lower case, ignore duplicates
-#
-
-# _network_tags() {
-#   ## for future use - filename & title for each tag
-#   tags=$(_hashed_tags)
-#   for tag in $tags; do
-#     title=$(grep "^# [a-Z0-9]*" "$match" | head -1)
-#     printf "%s$tag, $match, $title \n"
-#   done
-# }
 
 # =======================================================
 #     OPTION PARSING
