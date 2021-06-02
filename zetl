@@ -202,8 +202,8 @@ _cz() {
 #     OPTION PARSING
 # =======================================================
 
-OPTIONS=chdjwntm
-LONGOPTS=clean,tags,help,daily,journal,work,new,morning
+OPTIONS=chdjwnm
+LONGOPTS=clean,help,daily,journal,work,new,morning
 ! PARSED=$(getopt --options=$OPTIONS --longoptions=$LONGOPTS --name "$0" -- "$@")
 
 if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
@@ -216,7 +216,7 @@ eval set -- "$PARSED"
 
 if [ "$1" == '--' ]; then
   ## no options passed = help message
-  _network_tags
+  _print_help
 else
   while true; do
     case "$1" in
