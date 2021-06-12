@@ -2,10 +2,10 @@
 
 ## Filenames and paths
 SCRP_NME="$(basename "${0}")"
-JRNL_PTH="journal/" ## directory for 'journal' cards
-WORK_DIR="work/"    ## directory for 'work' cards
-BKUP_SRV="google"   ## backup to a service using rclone.
-NORM_LOC="Preston"  ## where are you normally located?
+ZETL_DIR="Zettelkasten/"       ## base dir
+JRNL_PTH="$ZETL_DIR/journal/" ## directory for 'journal' cards
+WORK_DIR="$ZETL_DIR/work/"    ## directory for 'work' cards
+BKUP_SRV="google"             ## backup to a service using rclone.
 
 ## Card titles
 JRNL_TTL="$(date +%y-%m-%d)"
@@ -20,10 +20,12 @@ Usage:
 Options:
   -h | --help     Show this screen.
   -d | --daily    Daily tasks in Journal/YYYY/MMM
-  -j | --journal  Journal card  in Journal/YYYY/MMM
+  -j | --journal  Journal card  in Journal.  Optionally takes a location
   -w | --work     work created under Work
   -n | --new      general card created in main zet dir
   -c | --clean    formats all *.md files using prettier
+  -s | --sync     pushes a commit of the Zettelkasten
+
 "
 }
 
@@ -52,7 +54,7 @@ journal_template() {
 
 ## $TITLE
 
-$(_weather_block)
+$(_weather_block $_LOCATION)
 
 ### What Happened
 
@@ -91,7 +93,7 @@ new_template() {
   META=$(meta)
   printf "%s$META
   
-  # $TITLE
+# $TITLE
 
 "
 }
@@ -101,7 +103,7 @@ work_template() {
   TAGS="work"
   printf "%s$META
   
-  # $TITLE
+# $TITLE
 
 "
 }
@@ -111,19 +113,19 @@ work_template() {
 # =======================================================
 
 _daily_exists() {
-  if [ -f "./journal/$JRNL_TTL.daily.md" ]; then
+  if [ -f "$JRNL_DIR$JRNL_TTL.daily.md" ]; then
     echo '+ [Daily]('"$JRNL_TTL"'.daily.md#Tasks)'
   fi
 }
 
 _mp_exists() {
-  if [ -f "./journal/$JRNL_TTL.mp.md" ]; then
+  if [ -f "$JRNL_DIR$JRNL_TTL.mp.md" ]; then
     echo '+ [Morning Pages]('"$JRNL_TTL"'.mp.md#Morning%%20Notes)'
   fi
 }
 
 _weather_block() {
-  curl wttr.in?format="%l\n%C+%t\nSunrise+%S\nSunset+%s\n+%m\n"
+  curl wttr.in/$1?format="%l\n%C+%t\nSunrise+%S\nSunset+%s\n+%m\n"
 }
 
 ## list latest cards for Journal entries
@@ -160,14 +162,14 @@ _clean_title() {
 _populate_card() {
   echo -e "$TEMPLATE" >"$1"
 }
-
+                  
 _edit_card() {
   vi "+normal G$" +startinsert! "$1"
 }
 
 _prettify_card() {
-  _binary_exists yarnpkg
-  yarnpkg prettier --write "$1"
+  _binary_exists npx
+  npx prettier --write "$1"
 }
 
 _populate_edit_prettify_card() {
@@ -198,12 +200,27 @@ _cz() {
   _minify_png
 }
 
+
+pushit() {
+  echo "pushit"
+  git pull && git add . && \
+  git commit -q -m "sync: $(date +"%Y-%m-%d %H:%M")" && git push
+}
+
+_github_sync() {
+  echo "sync called"
+  cd $ZETL_DIR || echo "no $ZETL_DIR. exiting" 
+  ## no changes OR sync-it
+  out_of_sync=$(git status --porcelain | wc -l)
+  [ "$out_of_sync" -eq 0 ] || pushit
+}
+
 # =======================================================
 #     OPTION PARSING
 # =======================================================
 
-OPTIONS=chdjwnm
-LONGOPTS=clean,help,daily,journal,work,new,morning
+OPTIONS=chdj:wnms
+LONGOPTS=clean,help,daily,journal,work,new,morning,sync
 ! PARSED=$(getopt --options=$OPTIONS --longoptions=$LONGOPTS --name "$0" -- "$@")
 
 if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
@@ -227,14 +244,14 @@ else
       shift
       ;;
     -j | --journal)
+      _LOCATION="$2"
+      shift 2
       TEMPLATE=$(journal_template)
       CARD="$JRNL_PTH$JRNL_TTL.md"
       _populate_edit_prettify_card "$CARD"
-      shift
       ;;
     -w | --work)
       shift
-
       title="$*"
       TITLE=${title#???}
       CARD="$WORK_DIR$ZETL_TTL-$(_clean_title "$TITLE").md"
@@ -249,7 +266,7 @@ else
       shift
       title="$*"
       TITLE=${title#??}
-      CARD="$ZETL_TTL-$(_clean_title "$TITLE").md"
+      CARD="$ZETL_DIR$ZETL_TTL-$(_clean_title "$TITLE").md"
       TEMPLATE=$(new_template)
       # META_STR="$(meta)"
       _populate_edit_prettify_card "$CARD"
@@ -263,6 +280,10 @@ else
     -h | --help)
       _print_help
       shift
+      ;;
+    -s | --sync)
+      shift
+      _github_sync
       ;;
     --)
       shift
