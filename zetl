@@ -202,13 +202,11 @@ _cz() {
 
 
 pushit() {
-  echo "pushit"
   git pull && git add . && \
   git commit -q -m "sync: $(date +"%Y-%m-%d %H:%M")" && git push
 }
 
 _github_sync() {
-  echo "sync called"
   cd $ZETL_DIR || echo "no $ZETL_DIR. exiting" 
   ## no changes OR sync-it
   out_of_sync=$(git status --porcelain | wc -l)
@@ -219,8 +217,8 @@ _github_sync() {
 #     OPTION PARSING
 # =======================================================
 
-OPTIONS=chdj:wnms
-LONGOPTS=clean,help,daily,journal,work,new,morning,sync
+OPTIONS=bchdj:wnms
+LONGOPTS=backup,clean,help,daily,journal,work,new,morning,sync
 ! PARSED=$(getopt --options=$OPTIONS --longoptions=$LONGOPTS --name "$0" -- "$@")
 
 if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
@@ -262,6 +260,10 @@ else
       _cz
       shift
       ;;
+    -b | --backup)
+      _backup_zetl
+      shift
+      ;; 
     -n | --new)
       shift
       title="$*"
