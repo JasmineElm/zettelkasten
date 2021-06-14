@@ -191,7 +191,7 @@ _backup_zetl() {
 
 _minify_png() {
   _binary_exists pngquant
-  pngquant ./**/*.png --skip-if-larger --ext .png --force
+  find . -iname "*.png" -exec pngquant {} --skip-if-larger --ext .png --force \;
 }
 
 _cz() {
