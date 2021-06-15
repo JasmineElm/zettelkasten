@@ -63,9 +63,7 @@ $(_weather_block $_LOCATION)
 
 $(_cards_since_x)
 
-$(_daily_exists)
-
-$(_mp_exists)
+$(_daily_exists) $(_mp_exists)
 
 [Yesterday]($(_last_journal)) <-- --> [Tomorrow]($TOMORROW.md)"
 }
@@ -167,6 +165,10 @@ _edit_card() {
   vi "+normal G$" +startinsert! "$1"
 }
 
+_fix_format() {
+  # convert files to use Pandoc's markdown
+  pandoc -t markdown_strict -s "$1" -o "$1"
+}
 _prettify_card() {
   _binary_exists npx
   npx prettier --write "$1"
@@ -195,8 +197,11 @@ _minify_png() {
 }
 
 _cz() {
-  _backup_zetl
-  _prettify_card './**/*.md'
+ # _backup_zetl
+ # _prettify_card './**/*.md'
+  export -f _fix_format
+  find ./**/*.md -exec bash -c '_fix_format "$1"' _ {} \;
+  unset _fix_format
   _minify_png
 }
 
