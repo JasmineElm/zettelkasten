@@ -2,7 +2,7 @@
 
 ## Filenames and paths
 SCRP_NME="$(basename "${0}")"
-ZETL_DIR="Zettelkasten/"       ## base dir
+ZETL_DIR="Zettelkasten"       ## base dir
 JRNL_PTH="$ZETL_DIR/journal/" ## directory for 'journal' cards
 WORK_DIR="$ZETL_DIR/work/"    ## directory for 'work' cards
 BKUP_SRV="google"             ## backup to a service using rclone.
@@ -19,11 +19,12 @@ Usage:
 
 Options:
   -h | --help     Show this screen.
-  -d | --daily    Daily tasks in Journal/YYYY/MMM
-  -j | --journal  Journal card  in Journal.  Optionally takes a location
-  -w | --work     work created under Work
+  -d | --daily    Daily tasks in Journal
+  -j | --journal  Journal card  in Journal.  requires a location
+                  e.g ./${SCRP_NME} -j London
+  -w | --work     work card created under $WORK_DIR
   -n | --new      general card created in main zet dir
-  -c | --clean    formats all *.md files using prettier
+  -c | --clean    formats all *.md files using pandoc
   -s | --sync     pushes a commit of the Zettelkasten
 
 "
@@ -44,6 +45,17 @@ tags: $TAGS
 "
 }
 
+morning-pages_template() {
+  TAGS="journal"
+  TITLE=$JRNL_TTL
+  META=$(meta "$TITLE" "$DATE_STR" "$TAGS")
+  printf "%s$META
+
+# Morning Pages: $JRNL_TTL
+
+"
+}
+ 
 journal_template() {
   TAGS="journal"
   TITLE=$JRNL_TTL
@@ -62,9 +74,7 @@ $(_weather_block $_LOCATION)
 ### Cards Since Yesterday
 
 $(_cards_since_x)
-
 $(_daily_exists) $(_mp_exists)
-
 [Yesterday]($(_last_journal)) <-- --> [Tomorrow]($TOMORROW.md)"
 }
 
@@ -77,7 +87,7 @@ daily_template() {
 
 # $TITLE
 
-_Card Count: $CARD_COUNT\_
+_Card Count: $CARD_COUNT _
 
 ![Active Goals](../active_goals.md#This%%20Week)
 
@@ -166,20 +176,22 @@ _edit_card() {
 }
 
 _fix_format() {
-  # convert files to use Pandoc's markdown
+  # convert files to use Pandoc's markdowni
   pandoc -t markdown_strict -s "$1" -o "$1"
 }
-_prettify_card() {
-  _binary_exists npx
-  npx prettier --write "$1"
-}
 
-_populate_edit_prettify_card() {
+#_prettify_card() {
+#  _binary_exists npx
+#  npx prettier --write "$1"
+#}
+
+_populate_edit_format_card() {
   local _CARD="$1"
   echo "$_CARD"
   _populate_card "$_CARD"
-  _edit_card "$_CARD"
-  _prettify_card "$_CARD"
+  _edit_card "$_CARD"  
+  _fix_format "$_CARD"
+  #_prettify_card "$_CARD"
 }
 
 _count_cards() {
@@ -243,7 +255,7 @@ else
     -d | --daily)
       TEMPLATE=$(daily_template)
       CARD="$JRNL_PTH/$JRNL_TTL.daily.md"
-      _populate_edit_prettify_card "$CARD"
+      _populate_edit_format_card "$CARD"
       shift
       ;;
     -j | --journal)
@@ -251,7 +263,7 @@ else
       shift 2
       TEMPLATE=$(journal_template)
       CARD="$JRNL_PTH$JRNL_TTL.md"
-      _populate_edit_prettify_card "$CARD"
+      _populate_edit_format_card "$CARD"
       ;;
     -w | --work)
       shift
@@ -259,7 +271,7 @@ else
       TITLE=${title#???}
       CARD="$WORK_DIR$ZETL_TTL-$(_clean_title "$TITLE").md"
       TEMPLATE=$(new_template)
-      _populate_edit_prettify_card "$CARD"
+      _populate_edit_format_card "$CARD"
       ;;
     -c | --clean)
       _cz
@@ -276,11 +288,12 @@ else
       CARD="$ZETL_DIR$ZETL_TTL-$(_clean_title "$TITLE").md"
       TEMPLATE=$(new_template)
       # META_STR="$(meta)"
-      _populate_edit_prettify_card "$CARD"
+      _populate_edit_format_card "$CARD"
       ;;
     -m | --morning)
       CARD="$JRNL_PTH$JRNL_TTL.mp.md"
-      _populate_edit_prettify_card "$CARD"
+      _populate_edit_format_card "$CARD"
+      TEMPLATE=$(morning-pages_template)
       # TODO: add writing prompt logic
       shift
       ;;
