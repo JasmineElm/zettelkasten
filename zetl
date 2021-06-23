@@ -35,12 +35,14 @@ Options:
 # =======================================================
 
 meta() {
-  DATE_STR=$(date)
+  DATE_STR="$(date +"%d/%m/%y %H:%M")
   printf "%s---
-title: $TITLE
+title: 
+  - $TITLE
 date: $DATE_STR
 aliases: 
-tags: $TAGS
+tags: 
+  - $TAGS
 ---
 "
 }
@@ -177,13 +179,8 @@ _edit_card() {
 
 _fix_format() {
   # convert files to use Pandoc's markdowni
-  pandoc -t markdown_strict -s "$1" -o "$1"
+  pandoc -t commonmark -s "$1" -o "$1"
 }
-
-#_prettify_card() {
-#  _binary_exists npx
-#  npx prettier --write "$1"
-#}
 
 _populate_edit_format_card() {
   local _CARD="$1"
@@ -209,11 +206,11 @@ _minify_png() {
 }
 
 _cz() {
- # _backup_zetl
- # _prettify_card './**/*.md'
+  echo "fixing format"
   export -f _fix_format
   find ./**/*.md -exec bash -c '_fix_format "$1"' _ {} \;
   unset _fix_format
+  echo "minifying png"
   _minify_png
 }
 
@@ -292,8 +289,8 @@ else
       ;;
     -m | --morning)
       CARD="$JRNL_PTH$JRNL_TTL.mp.md"
-      _populate_edit_format_card "$CARD"
       TEMPLATE=$(morning-pages_template)
+      _populate_edit_format_card "$CARD"
       # TODO: add writing prompt logic
       shift
       ;;
