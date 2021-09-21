@@ -11,21 +11,30 @@ BKUP_SRV="google"             ## backup to a service using rclone.
 JRNL_TTL="$(date +%y-%m-%d)"
 ZETL_TTL=$(date +"%Y%m%d%H%M")
 
+## make helptext look nice
+bld=$(tput bold)
+nml=$(tput sgr0)
+
 _print_help() {
   printf "%s
-Helper script to generate a zettelkasten card
+Helper script to generate a zettelkasten card and edit in vim
+
+Requires:   Pandoc, pngquant, rclone, and git (for -c, -b, -s)
+Recommends: vim-pandoc, vim-pandoc-syntax, md-img-paste, ctrlp
+
 Usage:
-  ${SCRP_NME} [<arguments>]
+  ${SCRP_NME} [<arguments>] [<location>|<card title>]
 
 Options:
-  -h | --help     Show this screen.
-  -d | --daily    Daily tasks in Journal
-  -j | --journal  Journal card  in Journal.  requires a location
-                  e.g ./${SCRP_NME} -j London
-  -w | --work     work card created under $WORK_DIR
-  -n | --new      general card created in main zet dir
-  -c | --clean    formats all *.md files using pandoc
-  -s | --sync     pushes a commit of the Zettelkasten
+${bld}  -h | --help${nml}     Show this screen.
+${bld}  -d | --daily${nml}    Daily tasks in ${bld}$JRNL_PTH${nml}
+${bld}  -m | --morning${nml}  Morning page in ${bld}$JRNL_PTH${nml}
+${bld}  -j | --journal${nml}  Journal card  in ${bld}$JRNL_PTH${nml}. requires a location
+${bld}  -w | --work${nml}     Named card created under ${bld}$WORK_DIR${nml}
+${bld}  -n | --new${nml}      Named card created under ${bld}$ZETL_DIR${nml}
+${bld}  -c | --clean${nml}    format md to commonmark, minify pngs
+${bld}  -s | --sync${nml}     pushes a commit of the Zettelkasten
+${bld}  -b | --backup${nml}   backup ${bld}$ZETL_DIR${nml} to ${bld}$BKUP_SRV${nml}
 
 "
 }
@@ -35,7 +44,7 @@ Options:
 # =======================================================
 
 meta() {
-  DATE_STR="$(date +"%d/%m/%y %H:%M")
+  DATE_STR=$(date +"%d/%m/%y %H:%M")
   printf "%s---
 title: 
   - $TITLE
@@ -62,13 +71,13 @@ journal_template() {
   TAGS="journal"
   TITLE=$JRNL_TTL
   META=$(meta "$TITLE" "$DATE_STR" "$TAGS")
-  #  YESTERDAY=$(date --date="yesterday" +%y-%m-%d)
+#  YESTERDAY=$(date --date="yesterday" +%y-%m-%d)
   TOMORROW=$(date --date="tomorrow" +%y-%m-%d)
   printf "%s$META
 
 ## $TITLE
 
-$(_weather_block $_LOCATION)
+$(_weather_block "$_LOCATION")
 
 ### What Happened
 
@@ -76,6 +85,7 @@ $(_weather_block $_LOCATION)
 ### Cards Since Yesterday
 
 $(_cards_since_x)
+
 $(_daily_exists) $(_mp_exists)
 [Yesterday]($(_last_journal)) <-- --> [Tomorrow]($TOMORROW.md)"
 }
@@ -92,7 +102,7 @@ daily_template() {
 _Card Count: $CARD_COUNT _
 
 ![Active Goals](../active_goals.md#This%%20Week)
-
+ 
 ## Tasks
 
 
@@ -123,13 +133,13 @@ work_template() {
 # =======================================================
 
 _daily_exists() {
-  if [ -f "$JRNL_DIR$JRNL_TTL.daily.md" ]; then
+  if [ -f "$JRNL_PTH$JRNL_TTL.daily.md" ]; then
     echo '+ [Daily]('"$JRNL_TTL"'.daily.md#Tasks)'
   fi
 }
 
 _mp_exists() {
-  if [ -f "$JRNL_DIR$JRNL_TTL.mp.md" ]; then
+  if [ -f "$JRNL_PTH$JRNL_TTL.mp.md" ]; then
     echo '+ [Morning Pages]('"$JRNL_TTL"'.mp.md#Morning%%20Notes)'
   fi
 }
@@ -154,7 +164,7 @@ _mins_since_last_journal() {
 
 _cards_since_x() {
   lms=$(_mins_since_last_journal)
-  readarray -d '' array < <(find . -not -path "./journal*" -mmin -"$lms" -iname '*.md' -print0)
+  readarray -d '' array < <(find . -not -path "./journal*" -cmin -"$lms" -iname '*.md' -print0)
   for i in "${array[@]}"; do
     echo "+ [$i]($i)"
   done
@@ -179,7 +189,13 @@ _edit_card() {
 
 _fix_format() {
   # convert files to use Pandoc's markdowni
-  pandoc -t commonmark -s "$1" -o "$1"
+  # pandoc -t commonmark -s "$1" -o "$1"
+  true
+}
+
+_prettify_card() {
+  _binary_exists npx
+  npx prettier --write "$1"
 }
 
 _populate_edit_format_card() {
@@ -188,7 +204,7 @@ _populate_edit_format_card() {
   _populate_card "$_CARD"
   _edit_card "$_CARD"  
   _fix_format "$_CARD"
-  #_prettify_card "$_CARD"
+  _prettify_card "$_CARD"
 }
 
 _count_cards() {
@@ -207,9 +223,7 @@ _minify_png() {
 
 _cz() {
   echo "fixing format"
-  export -f _fix_format
-  find ./**/*.md -exec bash -c '_fix_format "$1"' _ {} \;
-  unset _fix_format
+  _prettify_card './**/*.md'
   echo "minifying png"
   _minify_png
 }
@@ -251,7 +265,7 @@ else
     case "$1" in
     -d | --daily)
       TEMPLATE=$(daily_template)
-      CARD="$JRNL_PTH/$JRNL_TTL.daily.md"
+      CARD="$JRNL_PTH$JRNL_TTL.daily.md"
       _populate_edit_format_card "$CARD"
       shift
       ;;
@@ -275,6 +289,7 @@ else
       shift
       ;;
     -b | --backup)
+      echo "$JRNL_TTL"
       _backup_zetl
       shift
       ;; 
@@ -282,7 +297,7 @@ else
       shift
       title="$*"
       TITLE=${title#??}
-      CARD="$ZETL_DIR$ZETL_TTL-$(_clean_title "$TITLE").md"
+      CARD="$ZETL_DIR/$ZETL_TTL-$(_clean_title "$TITLE").md"
       TEMPLATE=$(new_template)
       # META_STR="$(meta)"
       _populate_edit_format_card "$CARD"
@@ -300,6 +315,7 @@ else
       ;;
     -s | --sync)
       shift
+      echo "$JRNL_TTL"
       _github_sync
       ;;
     --)
