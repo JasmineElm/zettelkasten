@@ -71,7 +71,6 @@ journal_template() {
   TAGS="journal"
   TITLE=$JRNL_TTL
   META=$(meta "$TITLE" "$DATE_STR" "$TAGS")
-#  YESTERDAY=$(date --date="yesterday" +%y-%m-%d)
   TOMORROW=$(date --date="tomorrow" +%y-%m-%d)
   printf "%s$META
 
@@ -102,7 +101,7 @@ daily_template() {
 _Card Count: $CARD_COUNT _
 
 ![Active Goals](../active_goals.md#This%%20Week)
- 
+
 ## Tasks
 
 
@@ -112,7 +111,7 @@ _Card Count: $CARD_COUNT _
 new_template() {
   META=$(meta)
   printf "%s$META
-  
+
 # $TITLE
 
 "
@@ -122,7 +121,7 @@ work_template() {
   META=$(meta)
   TAGS="work"
   printf "%s$META
-  
+
 # $TITLE
 
 "
@@ -182,15 +181,9 @@ _clean_title() {
 _populate_card() {
   echo -e "$TEMPLATE" >"$1"
 }
-                  
+
 _edit_card() {
   vi "+normal G$" +startinsert! "$1"
-}
-
-_fix_format() {
-  # convert files to use Pandoc's markdowni
-  # pandoc -t commonmark -s "$1" -o "$1"
-  true
 }
 
 _prettify_card() {
@@ -203,7 +196,6 @@ _populate_edit_format_card() {
   echo "$_CARD"
   _populate_card "$_CARD"
   _edit_card "$_CARD"  
-  _fix_format "$_CARD"
   _prettify_card "$_CARD"
 }
 
@@ -217,28 +209,38 @@ _backup_zetl() {
 }
 
 _minify_png() {
+  # minifies .png
   _binary_exists pngquant
   find . -iname "*.png" -exec pngquant {} --skip-if-larger --ext .png --force \;
 }
 
+_minify_jpg(){
+  jpegoptim  Zettelkasten/attachments/*.jp*g
+}
+
 _cz() {
+  # general housekeeping.
+  echo "removing empty files"
+  find . -empty -delete -print
   echo "fixing format"
   _prettify_card './**/*.md'
-  echo "minifying png"
+  echo "minifying images"
   _minify_png
+  _minify_jpg
 }
 
 
 pushit() {
+  # wrapper for git push, should cover most use-cases
   git pull && git add . && \
   git commit -q -m "sync: $(date +"%Y-%m-%d %H:%M")" && git push
 }
 
 _github_sync() {
+  # if we have changes, they should be pushed
   cd $ZETL_DIR || echo "no $ZETL_DIR. exiting" 
-  ## no changes OR sync-it
   out_of_sync=$(git status --porcelain | wc -l)
-  [ "$out_of_sync" -eq 0 ] || pushit
+  [ "$out_of_sync" -ne 0 ] && pushit
 }
 
 # =======================================================
@@ -299,7 +301,6 @@ else
       TITLE=${title#??}
       CARD="$ZETL_DIR/$ZETL_TTL-$(_clean_title "$TITLE").md"
       TEMPLATE=$(new_template)
-      # META_STR="$(meta)"
       _populate_edit_format_card "$CARD"
       ;;
     -m | --morning)
@@ -315,7 +316,7 @@ else
       ;;
     -s | --sync)
       shift
-      echo "$JRNL_TTL"
+      echo "sync called $(date)"
       _github_sync
       ;;
     --)
