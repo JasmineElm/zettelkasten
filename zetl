@@ -144,7 +144,7 @@ _mp_exists() {
 }
 
 _weather_block() {
-  curl wttr.in/$1?format="%l\n%C+%t\nSunrise+%S\nSunset+%s\n+%m\n"
+  curl "wttr.in/$1?format=%ln\\n%C+%t\\nSunrise+%S\\nSunset+%s\\n+%m\\n"
 }
 
 ## list latest cards for Journal entries
