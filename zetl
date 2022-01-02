@@ -50,6 +50,7 @@ title:
   - $TITLE
 date: $DATE_STR
 aliases: 
+  - $TITLE
 tags: 
   - $TAGS
 ---
@@ -144,7 +145,7 @@ _mp_exists() {
 }
 
 _weather_block() {
-  curl "wttr.in/$1?format=%ln\\n%C+%t\\nSunrise+%S\\nSunset+%s\\n+%m\\n"
+  curl "wttr.in/$1?format=%l\\n%C+%t\\nSunrise+%S\\nSunset+%s\\n+%m\n" 
 }
 
 ## list latest cards for Journal entries
@@ -176,8 +177,19 @@ _binary_exists() {
 }
 
 _clean_title() {
-  echo "$*" | sed 's/ /_/g' | tr '[:upper:]' '[:lower:]'
+  # no spaces, all lower case, printable characters only, max len: 255
+  echo "$*" | sed 's/ /_/g' \
+    | tr '[:upper:]' '[:lower:]' \
+    | tr -cd '[:print:]' \
+    | head -c 255
 }
+
+_clean_filename() {
+  for markdown in **/*.md; do
+    echo mv "$markdown" "$(_clean_title "$markdown")"
+  done
+}
+
 _populate_card() {
   echo -e "$TEMPLATE" >"$1"
 }
@@ -220,6 +232,8 @@ _minify_jpg(){
 
 _cz() {
   # general housekeeping.
+  # echo " fixing titles"
+  # _clean_filename 
   echo "removing empty files"
   find . -empty -delete -print
   echo "fixing format"
