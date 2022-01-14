@@ -6,7 +6,9 @@ ZETL_DIR="Zettelkasten"       ## base dir
 JRNL_PTH="$ZETL_DIR/journal/" ## directory for 'journal' cards
 WORK_DIR="$ZETL_DIR/work/"    ## directory for 'work' cards
 BKUP_SRV="google"             ## backup to a service using rclone.
-
+BKUP_DIR="$ZETL_DIR"
+TRSH_DIR="$ZETL_DIR/.trash"   ## Trash Directory, relative to $ZETL_DIR
+KEEP_FOR=14                   ## Files in $TRSH_DIR > this should be deleted
 ## Card titles
 JRNL_TTL="$(date +%y-%m-%d)"
 ZETL_TTL=$(date +"%Y%m%d%H%M")
@@ -23,19 +25,35 @@ Requires:   Pandoc, pngquant, rclone, and git (for -c, -b, -s)
 Recommends: vim-pandoc, vim-pandoc-syntax, md-img-paste, ctrlp
 
 Usage:
-  ${SCRP_NME} [<arguments>] [<location>|<card title>]
+  ${SCRP_NME} [<arguments>]
 
 Options:
-${bld}  -h | --help${nml}     Show this screen.
-${bld}  -d | --daily${nml}    Daily tasks in ${bld}$JRNL_PTH${nml}
-${bld}  -m | --morning${nml}  Morning page in ${bld}$JRNL_PTH${nml}
-${bld}  -j | --journal${nml}  Journal card  in ${bld}$JRNL_PTH${nml}. requires a location
-${bld}  -w | --work${nml}     Named card created under ${bld}$WORK_DIR${nml}
-${bld}  -n | --new${nml}      Named card created under ${bld}$ZETL_DIR${nml}
-${bld}  -c | --clean${nml}    format md to commonmark, minify pngs
-${bld}  -s | --sync${nml}     pushes a commit of the Zettelkasten
-${bld}  -b | --backup${nml}   backup ${bld}$ZETL_DIR${nml} to ${bld}$BKUP_SRV${nml}
+${bld}  -h | --help${nml}         
+    Show this screen.
+${bld}  -d | --daily${nml}        
+    Daily card ${bld}$JRNL_PTH${nml}
+${bld}  -m | --morning${nml}      
+    Morning page in ${bld}$JRNL_PTH${nml}
+${bld}  -j | --journal [loc]${nml}
+    Journal card in ${bld}$JRNL_PTH${nml}
+${bld}  -w | --work${nml}         
+    Named card created under ${bld}$WORK_DIR${nml}
+${bld}  -n | --new${nml}         
+    Named card created under ${bld}$ZETL_DIR${nml}
+${bld}  -c | --clean${nml}        
+    remove empty files, prettify markdown, minify pngs
+${bld}  -s | --sync${nml}         
+    pushes git commit of the Zettelkasten
+${bld}  -b | --backup${nml}       
+    backup ${bld}$ZETL_DIR${nml} to ${bld}$BKUP_SRV${nml}
+${bld}  -e | --emotion [1-5]${nml}
+    paste a timestamp and emotion to daily card
 
+Examples:
+  ${bld}${SCRP_NME} -e 2${nml}      
+    pastes a timestamp/emotion check to today's daily card
+  ${bld}${SCRP_NME} -j London${nml} 
+    creates a journal card with location of London
 "
 }
 
@@ -91,6 +109,7 @@ $(_daily_exists) $(_mp_exists)
 }
 
 daily_template() {
+  PROMPT=$(_daily_prompt)
   TAGS="Daily"
   TITLE="$JRNL_TTL - DAILY"
   CARD_COUNT="$(_count_cards)"
@@ -99,11 +118,11 @@ daily_template() {
 
 # $TITLE
 
-_Card Count: $CARD_COUNT _
+*Card Count: $CARD_COUNT*
 
-![Active Goals](../active_goals.md#This%%20Week)
+![tasks](__KANBAN.md)
 
-## Tasks
+*\"$PROMPT\"*
 
 
 "
@@ -136,6 +155,10 @@ _daily_exists() {
   if [ -f "$JRNL_PTH$JRNL_TTL.daily.md" ]; then
     echo '+ [Daily]('"$JRNL_TTL"'.daily.md#Tasks)'
   fi
+}
+
+_daily_prompt() {
+  shuf prompts | head -1
 }
 
 _mp_exists() {
@@ -208,7 +231,7 @@ _populate_edit_format_card() {
   echo "$_CARD"
   _populate_card "$_CARD"
   _edit_card "$_CARD"  
-  _prettify_card "$_CARD"
+  #_prettify_card "$_CARD"
 }
 
 _count_cards() {
@@ -217,7 +240,7 @@ _count_cards() {
 
 _backup_zetl() {
   _binary_exists rclone
-  rclone copy . "$BKUP_SRV:zetlkasten"
+  rclone copy "$ZETL_DIR" "$BKUP_SRV":"$BKUP_DIR"
 }
 
 _minify_png() {
@@ -230,12 +253,24 @@ _minify_jpg(){
   jpegoptim  Zettelkasten/attachments/*.jp*g
 }
 
+_clear_trash(){
+  find "$TRSH_DIR" -mtime +"$KEEP_FOR" -exec rm {} \;
+}
+
+_trash_empty_files(){
+  find $ZETL_DIR -empty \
+    -not -path "$TRSH_DIR/*" \
+    -type f -exec mv {} "$TRSH_DIR" \;
+}
+
 _cz() {
   # general housekeeping.
   # echo " fixing titles"
   # _clean_filename 
-  echo "removing empty files"
-  find . -empty -delete -print
+  echo "clearing trash, files older than $KEEP_FOR will be removed"
+  _clear_trash
+  echo "moving empty files to $TRSH_DIR"
+  _trash_empty_files
   echo "fixing format"
   _prettify_card './**/*.md'
   echo "minifying images"
@@ -243,6 +278,24 @@ _cz() {
   _minify_jpg
 }
 
+_time_string(){
+  date +"%H:%M"
+}
+
+_emotion_check() {
+  # 1-5: angry to ecstatic
+  emotion=${1:-}
+  _time=$(_time_string)
+  case $emotion in 
+    1) emoji="😠" ;;
+    2) emoji="😟" ;;
+    3) emoji="😐" ;;
+    4) emoji="😊" ;;
+    5) emoji="😁" ;;
+    *) emoji="😐" ;;
+  esac
+  echo -e "\n$_time - $emoji"
+}
 
 pushit() {
   # wrapper for git push, should cover most use-cases
@@ -261,8 +314,8 @@ _github_sync() {
 #     OPTION PARSING
 # =======================================================
 
-OPTIONS=bchdj:wnms
-LONGOPTS=backup,clean,help,daily,journal,work,new,morning,sync
+OPTIONS=bchdje:wnms
+LONGOPTS=backup,clean,help,daily,journal,work,new,morning,sync,emotion
 ! PARSED=$(getopt --options=$OPTIONS --longoptions=$LONGOPTS --name "$0" -- "$@")
 
 if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
@@ -332,6 +385,14 @@ else
       shift
       echo "sync called $(date)"
       _github_sync
+      ;;
+    -e | --emotion)
+      _SENTIMENT="$2"
+      emotion_string=$(_emotion_check "$_SENTIMENT")
+      CARD="$JRNL_PTH$JRNL_TTL.daily.md"
+      shift 2
+      echo "$emotion_string" >> "$CARD"
+      echo "$emotion_string >> $CARD"
       ;;
     --)
       shift
