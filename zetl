@@ -2,27 +2,20 @@
 
 ## Filenames and paths
 SCRP_NME="$(basename "${0}")"
-ZETL_DIR="Zettelkasten"       ## base dir
-JRNL_PTH="$ZETL_DIR/journal/" ## directory for 'journal' cards
-WORK_DIR="$ZETL_DIR/work/"    ## directory for 'work' cards
-BKUP_SRV="google"             ## backup to a service using rclone.
-BKUP_DIR="$ZETL_DIR"
-TRSH_DIR="$ZETL_DIR/.trash"   ## Trash Directory, relative to $ZETL_DIR
-KEEP_FOR=14                   ## Files in $TRSH_DIR > this should be deleted
-## Card titles
-JRNL_TTL="$(date +%y-%m-%d)"
-ZETL_TTL=$(date +"%Y%m%d%H%M")
 
-## make helptext look nice
+JRNL_TTL="$(date +%y-%m-%d)"
+ZETL_TTL="$(date +%Y%m%d%H%M)"
+
+# config now in ./zetlrc
+source ./zetlrc
+
+## make helptext look nice in clever terminals.
 bld=$(tput bold)
 nml=$(tput sgr0)
 
 _print_help() {
   printf "%s
 Helper script to generate a zettelkasten card and edit in vim
-
-Requires:   Pandoc, pngquant, rclone, and git (for -c, -b, -s)
-Recommends: vim-pandoc, vim-pandoc-syntax, md-img-paste, ctrlp
 
 Usage:
   ${SCRP_NME} [<arguments>]
@@ -32,12 +25,8 @@ ${bld}  -h | --help${nml}
     Show this screen.
 ${bld}  -d | --daily${nml}        
     Daily card ${bld}$JRNL_PTH${nml}
-${bld}  -m | --morning${nml}      
-    Morning page in ${bld}$JRNL_PTH${nml}
 ${bld}  -j | --journal [loc]${nml}
     Journal card in ${bld}$JRNL_PTH${nml}
-${bld}  -w | --work${nml}         
-    Named card created under ${bld}$WORK_DIR${nml}
 ${bld}  -n | --new${nml}         
     Named card created under ${bld}$ZETL_DIR${nml}
 ${bld}  -c | --clean${nml}        
@@ -75,17 +64,6 @@ tags:
 "
 }
 
-morning-pages_template() {
-  TAGS="journal"
-  TITLE=$JRNL_TTL
-  META=$(meta "$TITLE" "$DATE_STR" "$TAGS")
-  printf "%s$META
-
-# Morning Pages: $JRNL_TTL
-
-"
-}
- 
 journal_template() {
   TAGS="journal"
   TITLE=$JRNL_TTL
@@ -95,6 +73,8 @@ journal_template() {
 
 ## $TITLE
 
+Day: $(date +%j) 
+
 $(_weather_block "$_LOCATION")
 
 ### What Happened
@@ -102,12 +82,10 @@ $(_weather_block "$_LOCATION")
 
 ### Cards Since Yesterday
 
-$(_cards_since_x)
+$(_daily_exists)
 
-$(_daily_exists) $(_mp_exists)
 [Yesterday]($(_last_journal)) <-- --> [Tomorrow]($TOMORROW.md)"
 }
-
 daily_template() {
   PROMPT=$(_daily_prompt)
   TAGS="Daily"
@@ -137,23 +115,11 @@ new_template() {
 "
 }
 
-work_template() {
-  META=$(meta)
-  TAGS="work"
-  printf "%s$META
-
-# $TITLE
-
-"
-}
-
-# =======================================================
-#     FUNCTIONS
 # =======================================================
 
 _daily_exists() {
   if [ -f "$JRNL_PTH$JRNL_TTL.daily.md" ]; then
-    echo '+ [Daily]('"$JRNL_TTL"'.daily.md#Tasks)'
+    printf '%s[Daily]('"$JRNL_TTL"'.daily.md)'
   fi
 }
 
@@ -161,14 +127,8 @@ _daily_prompt() {
   shuf prompts | head -1
 }
 
-_mp_exists() {
-  if [ -f "$JRNL_PTH$JRNL_TTL.mp.md" ]; then
-    echo '+ [Morning Pages]('"$JRNL_TTL"'.mp.md#Morning%%20Notes)'
-  fi
-}
-
-_weather_block() {
-  curl "wttr.in/$1?format=%l\\n%C+%t\\nSunrise+%S\\nSunset+%s\\n+%m\n" 
+_weather_block() {                                                           
+  curl "wttr.in/$1?format=%l\\n%C+%t\\nSunrise+%S\\nSunset+%s\\n+%m\n"·      
 }
 
 ## list latest cards for Journal entries
@@ -176,31 +136,16 @@ _last_journal() {
   for file in "$JRNL_PTH"/[0-9][0-9]-[0-9][0-9]-[0-9][0-9].md; do
     [[ $file -nt $latest ]] && latest=$file
   done
-  echo "${latest##*/}"
-}
-
-_mins_since_last_journal() {
-  lst_fle="$(_last_journal)"
-  mslj=$(((($(date +%s) - $(date +%s -r "$JRNL_PTH$lst_fle"))) / 60))
-  echo $mslj
-}
-
-_cards_since_x() {
-  lms=$(_mins_since_last_journal)
-  readarray -d '' array < <(find . -not -path "./journal*" -cmin -"$lms" -iname '*.md' -print0)
-  for i in "${array[@]}"; do
-    echo "+ [$i]($i)"
-  done
+  printf "%s${latest##*/}"
 }
 
 _binary_exists() {
   if [ "$(command -v "$1" | wc -l)" -eq 0 ]; then
-    echo "cannot find $1 ... Exiting" && exit 1
+    printf "%scannot find $1 ... Exiting\n" && exit 1
   fi
 }
 
 _clean_title() {
-  # no spaces, all lower case, printable characters only, max len: 255
   echo "$*" | sed 's/ /_/g' \
     | tr '[:upper:]' '[:lower:]' \
     | tr -cd '[:print:]' \
@@ -209,7 +154,7 @@ _clean_title() {
 
 _clean_filename() {
   for markdown in **/*.md; do
-    echo mv "$markdown" "$(_clean_title "$markdown")"
+    "$markdown" "$(_clean_title "$markdown")"
   done
 }
 
@@ -228,10 +173,9 @@ _prettify_card() {
 
 _populate_edit_format_card() {
   local _CARD="$1"
-  echo "$_CARD"
   _populate_card "$_CARD"
-  _edit_card "$_CARD"  
-  #_prettify_card "$_CARD"
+  _edit_card "$_CARD"
+  _prettify_card "$_CARD"
 }
 
 _count_cards() {
@@ -244,20 +188,19 @@ _backup_zetl() {
 }
 
 _minify_png() {
-  # minifies .png
   _binary_exists pngquant
   find . -iname "*.png" -exec pngquant {} --skip-if-larger --ext .png --force \;
 }
 
-_minify_jpg(){
-  jpegoptim  Zettelkasten/attachments/*.jp*g
+_minify_jpg() {
+  jpegoptim Zettelkasten/attachments/*.[jJ][pP]*[gG]
 }
 
-_clear_trash(){
+_clear_trash() {
   find "$TRSH_DIR" -mtime +"$KEEP_FOR" -exec rm {} \;
 }
 
-_trash_empty_files(){
+_trash_empty_files() {
   find $ZETL_DIR -empty \
     -not -path "$TRSH_DIR/*" \
     -type f -exec mv {} "$TRSH_DIR" \;
@@ -265,8 +208,6 @@ _trash_empty_files(){
 
 _cz() {
   # general housekeeping.
-  # echo " fixing titles"
-  # _clean_filename 
   echo "clearing trash, files older than $KEEP_FOR will be removed"
   _clear_trash
   echo "moving empty files to $TRSH_DIR"
@@ -278,7 +219,7 @@ _cz() {
   _minify_jpg
 }
 
-_time_string(){
+_time_string() {
   date +"%H:%M"
 }
 
@@ -286,7 +227,7 @@ _emotion_check() {
   # 1-5: angry to ecstatic
   emotion=${1:-}
   _time=$(_time_string)
-  case $emotion in 
+  case $emotion in
     1) emoji="😠" ;;
     2) emoji="😟" ;;
     3) emoji="😐" ;;
@@ -294,18 +235,18 @@ _emotion_check() {
     5) emoji="😁" ;;
     *) emoji="😐" ;;
   esac
-  echo -e "\n$_time - $emoji"
+  echo -e "\\n$_time - $emoji"
 }
 
 pushit() {
   # wrapper for git push, should cover most use-cases
-  git pull && git add . && \
-  git commit -q -m "sync: $(date +"%Y-%m-%d %H:%M")" && git push
+  git pull && git add . \
+    && git commit -q -m "sync: $(date +"%Y-%m-%d %H:%M")" && git push
 }
 
 _github_sync() {
   # if we have changes, they should be pushed
-  cd $ZETL_DIR || echo "no $ZETL_DIR. exiting" 
+  cd $ZETL_DIR || echo "no $ZETL_DIR. exiting"
   out_of_sync=$(git status --porcelain | wc -l)
   [ "$out_of_sync" -ne 0 ] && pushit
 }
@@ -314,24 +255,19 @@ _github_sync() {
 #     OPTION PARSING
 # =======================================================
 
-OPTIONS=bchdje:wnms
-LONGOPTS=backup,clean,help,daily,journal,work,new,morning,sync,emotion
+OPTIONS=bchde:nsj
+LONGOPTS=backup,clean,help,daily,emotion,journal,new,sync
 ! PARSED=$(getopt --options=$OPTIONS --longoptions=$LONGOPTS --name "$0" -- "$@")
 
 if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
   # e.g. return value is 1
-  # getopt has complained about wrong arguments to stdout
   exit 2
 fi
 # read getopt’s output this way to handle the quoting right:
 eval set -- "$PARSED"
 
-if [ "$1" == '--' ]; then
-  ## no options passed = help message
-  _print_help
-else
-  while true; do
-    case "$1" in
+while true; do
+  case "$1" in
     -d | --daily)
       TEMPLATE=$(daily_template)
       CARD="$JRNL_PTH$JRNL_TTL.daily.md"
@@ -339,18 +275,10 @@ else
       shift
       ;;
     -j | --journal)
-      _LOCATION="$2"
+      _LOCATION="$3"
       shift 2
       TEMPLATE=$(journal_template)
       CARD="$JRNL_PTH$JRNL_TTL.md"
-      _populate_edit_format_card "$CARD"
-      ;;
-    -w | --work)
-      shift
-      title="$*"
-      TITLE=${title#???}
-      CARD="$WORK_DIR$ZETL_TTL-$(_clean_title "$TITLE").md"
-      TEMPLATE=$(new_template)
       _populate_edit_format_card "$CARD"
       ;;
     -c | --clean)
@@ -361,7 +289,7 @@ else
       echo "$JRNL_TTL"
       _backup_zetl
       shift
-      ;; 
+      ;;
     -n | --new)
       shift
       title="$*"
@@ -369,13 +297,6 @@ else
       CARD="$ZETL_DIR/$ZETL_TTL-$(_clean_title "$TITLE").md"
       TEMPLATE=$(new_template)
       _populate_edit_format_card "$CARD"
-      ;;
-    -m | --morning)
-      CARD="$JRNL_PTH$JRNL_TTL.mp.md"
-      TEMPLATE=$(morning-pages_template)
-      _populate_edit_format_card "$CARD"
-      # TODO: add writing prompt logic
-      shift
       ;;
     -h | --help)
       _print_help
@@ -391,16 +312,11 @@ else
       emotion_string=$(_emotion_check "$_SENTIMENT")
       CARD="$JRNL_PTH$JRNL_TTL.daily.md"
       shift 2
-      echo "$emotion_string" >> "$CARD"
-      echo "$emotion_string >> $CARD"
+      echo "$emotion_string" >>"$CARD"
       ;;
-    --)
+    *)
       shift
       break
       ;;
-    *)
-      _print_help
-      ;;
-    esac
-  done
-fi
+  esac
+done

@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+## Filenames and paths
+ZETL_DIR="Zettelkasten"       ## base dir
+JRNL_PTH="$ZETL_DIR/journal/" ## directory for 'journal' cards
+WORK_DIR="$ZETL_DIR/work/"    ## directory for 'work' cards
+
+# Backup
+BKUP_SRV="google"             ## backup to a service using rclone.
+BKUP_DIR="$ZETL_DIR"
+
+# Trash
+TRSH_DIR="$ZETL_DIR/.trash"   ## Trash Directory, relative to $ZETL_DIR
+KEEP_FOR=14                   ## Files in $TRSH_DIR > this should be deleted
+
+
+# Reflective prompts
+PROMPTS="prompts"             ## reflective prompt file. 1 prompt per line
+
+
+JRNL_TTL="$(date +%y-%m-%d)"
+ZETL_TTL="$(date +%Y%m%d%H%M)"
+
