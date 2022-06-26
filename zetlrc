@@ -1,23 +1,33 @@
 #!/usr/bin/env bash
 
+# these are all referenced in the main script...
+#shellcheck disable=SC2034
+
 ## Filenames and paths
-ZETL_DIR="Zettelkasten"       ## base dir
-JRNL_PTH="$ZETL_DIR/journal/" ## directory for 'journal' cards
-WORK_DIR="$ZETL_DIR/work/"    ## directory for 'work' cards
+ZETL_DIR="Zettelkasten"             ## base dir
+READ_DIR="$ZETL_DIR/01_Reading_Notes/"
+NOTE_DIR="$ZETL_DIR/02_Transient_Notes/"
+WRTE_DIR="$ZETL_DIR/03_Writing_Inbox"
+CARD_DIR="$ZETL_DIR/04_Evergreen_Notes"
+POST_DIR="$ZETL_DIR/05_Speculative_Articles"
+
+
+JRNL_PTH="$ZETL_DIR/journals/"      ## directory for 'journal' cards
+WORK_DIR="$NOTE_DIR/__Work/"        ## directory for 'work' cards
 
 # Backup
-BKUP_SRV="google"             ## backup to a service using rclone.
+BKUP_SRV="google"                   ## backup to a service using rclone.
 BKUP_DIR="$ZETL_DIR"
 
 # Trash
-TRSH_DIR="$ZETL_DIR/.trash"   ## Trash Directory, relative to $ZETL_DIR
-KEEP_FOR=14                   ## Files in $TRSH_DIR > this should be deleted
+TRSH_DIR="$ZETL_DIR/.trash"         ## Trash Directory, relative to $ZETL_DIR
+KEEP_FOR=14                         ## Files in $TRSH_DIR > this should be deleted
 
 
-# Reflective prompts
-PROMPTS="prompts"             ## reflective prompt file. 1 prompt per line
+# Daily Information
+PROMPTS="prompts"                   ## reflective prompt file. 1 prompt per line
+CARD_LNK="../__KANBAN"              ## link to a card refereced in daily template
 
-
-JRNL_TTL="$(date +%y-%m-%d)"
-ZETL_TTL="$(date +%Y%m%d%H%M)"
-
+# Kanban
+KNBN_BRD="$ZETL_DIR/__Kanban.md"    ## where's your Kanban Board?
+KNBN_LST="To-do Next"               ## which list should new cards go into?

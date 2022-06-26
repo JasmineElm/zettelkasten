@@ -21,27 +21,29 @@ Usage:
   ${SCRP_NME} [<arguments>]
 
 Options:
-${bld}  -h | --help${nml}         
+${bld}  -h | --help${nml}
     Show this screen.
-${bld}  -d | --daily${nml}        
+${bld}  -d | --daily${nml}
     Daily card ${bld}$JRNL_PTH${nml}
 ${bld}  -j | --journal [loc]${nml}
     Journal card in ${bld}$JRNL_PTH${nml}
-${bld}  -n | --new${nml}         
+${bld}  -n | --new${nml}
     Named card created under ${bld}$ZETL_DIR${nml}
-${bld}  -c | --clean${nml}        
+${bld}  -k | --kanban${nml}
+    add a kanban task to  ${bld}$KNBN_BRD:$KNBN_LST${nml}
+${bld}  -c | --clean${nml}
     remove empty files, prettify markdown, minify pngs
-${bld}  -s | --sync${nml}         
+${bld}  -s | --sync${nml}
     pushes git commit of the Zettelkasten
-${bld}  -b | --backup${nml}       
+${bld}  -b | --backup${nml}
     backup ${bld}$ZETL_DIR${nml} to ${bld}$BKUP_SRV${nml}
 ${bld}  -e | --emotion [1-5]${nml}
     paste a timestamp and emotion to daily card
 
 Examples:
-  ${bld}${SCRP_NME} -e 2${nml}      
+  ${bld}${SCRP_NME} -e 2${nml}
     pastes a timestamp/emotion check to today's daily card
-  ${bld}${SCRP_NME} -j London${nml} 
+  ${bld}${SCRP_NME} -j London${nml}
     creates a journal card with location of London
 "
 }
@@ -53,12 +55,12 @@ Examples:
 meta() {
   DATE_STR=$(date +"%d/%m/%y %H:%M")
   printf "%s---
-title: 
+title:
   - $TITLE
 date: $DATE_STR
-aliases: 
+aliases:
   - $TITLE
-tags: 
+tags:
   - $TAGS
 ---
 "
@@ -73,7 +75,7 @@ journal_template() {
 
 ## $TITLE
 
-Day: $(date +%j) 
+Day: $(date +%j)
 
 $(_weather_block "$_LOCATION")
 
@@ -127,8 +129,8 @@ _daily_prompt() {
   shuf prompts | head -1
 }
 
-_weather_block() {                                                           
-  curl "wttr.in/$1?format=%l\\n%C+%t\\nSunrise+%S\\nSunset+%s\\n+%m\n"·      
+_weather_block() {
+  curl "wttr.in/$1?format=%l\\n%C+%t\\nSunrise+%S\\nSunset+%s\\n+%m\n"·
 }
 
 ## list latest cards for Journal entries
@@ -148,7 +150,7 @@ _binary_exists() {
 _clean_title() {
   echo "$*" | sed 's/ /_/g' \
     | tr '[:upper:]' '[:lower:]' \
-    | tr -cd '[:print:]' \
+    | tr -cd '[:alnum:]._-@' \
     | head -c 255
 }
 
@@ -200,23 +202,45 @@ _clear_trash() {
   find "$TRSH_DIR" -mtime +"$KEEP_FOR" -exec rm {} \;
 }
 
+_fix_dropbox_sync_errors() {
+  ## dumbly move anything with "conflict" in the name to trash
+  conflicts=("*conflicted*" "*Case Conflict*")
+  for conflict in "${conflicts[@]}"; do
+    find "$ZETL_DIR" -iname "$conflict" \
+      -not -path "$TRSH_DIR/*" \
+      -exec mv -v {} "$TRSH_DIR" \;
+  done
+}
+
 _trash_empty_files() {
-  find $ZETL_DIR -empty \
+  find "$ZETL_DIR" -empty \
     -not -path "$TRSH_DIR/*" \
-    -type f -exec mv {} "$TRSH_DIR" \;
+    -type f -exec mv -v {} "$TRSH_DIR" \;
+}
+
+_git_prune() {
+  # Histoy is good, but let's not gobble up diskspace with it
+  git reflog expire --expire=now --all
+  git gc --aggressive --prune=now
 }
 
 _cz() {
   # general housekeeping.
-  echo "clearing trash, files older than $KEEP_FOR will be removed"
+  echo -e "${bld}>>>\t${nml}removing dropbox conflicts"
+  _fix_dropbox_sync_errors
+  echo -e "${bld}>>>\t${nml}deleting files older than $KEEP_FOR from .trash"
   _clear_trash
-  echo "moving empty files to $TRSH_DIR"
+  echo -e "${bld}>>>\t${nml}Fixing filenames format ( [:alnum:]._-=)"
+  _clear_trash
+  echo -e "${bld}>>>\t${nml}moving empty files to $TRSH_DIR"
   _trash_empty_files
-  echo "fixing format"
+  echo -e "${bld}>>>\t${nml}fixing format"
   _prettify_card './**/*.md'
-  echo "minifying images"
+  echo -e "${bld}>>>\t${nml}minifying images"
   _minify_png
   _minify_jpg
+  echo -e "${bld}>>>\t${nml}Pruning Git"
+  _git_prune
 }
 
 _time_string() {
@@ -238,15 +262,30 @@ _emotion_check() {
   echo -e "\\n$_time - $emoji"
 }
 
+_find_kanban_list() {
+  local board=${1:-}
+  local list=${2:-}
+  [[ -f "$board" ]] || exit 1
+  lineno=$(grep -n "$list" "$board" | cut -d : -f 1 |tail -1)
+  echo $((lineno+1))
+}
+
+_insert_task() {
+  local insert_at
+  insert_at="$(_find_kanban_list "$KNBN_BRD" "$KNBN_LST")"
+  local task="$*"
+  sed -i "$insert_at"i\ "- [ ] $task" "$KNBN_BRD"
+}
+
 pushit() {
   # wrapper for git push, should cover most use-cases
-  git pull && git add . \
+  git pull && git add -A\
     && git commit -q -m "sync: $(date +"%Y-%m-%d %H:%M")" && git push
 }
 
 _github_sync() {
   # if we have changes, they should be pushed
-  cd $ZETL_DIR || echo "no $ZETL_DIR. exiting"
+  cd "$ZETL_DIR" || echo "no $ZETL_DIR. exiting"
   out_of_sync=$(git status --porcelain | wc -l)
   [ "$out_of_sync" -ne 0 ] && pushit
 }
@@ -255,8 +294,8 @@ _github_sync() {
 #     OPTION PARSING
 # =======================================================
 
-OPTIONS=bchde:nsj
-LONGOPTS=backup,clean,help,daily,emotion,journal,new,sync
+OPTIONS=bchde:nsjk
+LONGOPTS=backup,clean,help,daily,emotion,journal,new,sync,kanban
 ! PARSED=$(getopt --options=$OPTIONS --longoptions=$LONGOPTS --name "$0" -- "$@")
 
 if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
@@ -297,6 +336,12 @@ while true; do
       CARD="$ZETL_DIR/$ZETL_TTL-$(_clean_title "$TITLE").md"
       TEMPLATE=$(new_template)
       _populate_edit_format_card "$CARD"
+      ;;
+      -k | --kanban)
+      shift
+      task="$*"
+      task=${task#??}
+      _insert_task "$task"
       ;;
     -h | --help)
       _print_help
