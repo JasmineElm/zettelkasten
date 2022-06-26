@@ -9,9 +9,9 @@ faster to use vim for quick notes on the go, particularly with termux.
 
 ## TODO:
 
-[x] externalise config
-[ ] better emotion tracking
-[ ] sample, example cron
-[ ] better clearing 
-  [ ] identify duplicates
-  [ ] identify orphans
+- [x] externalise config
+- [ ] better emotion tracking
+- [ ] sample, example cron
+- [ ] better clearing 
+  - [ ] identify duplicates
+  - [ ] identify orphans
