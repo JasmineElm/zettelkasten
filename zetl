@@ -2,7 +2,6 @@
 
 ## Filenames and paths
 SCRP_NME="$(basename "${0}")"
-
 JRNL_TTL="$(date +%y-%m-%d)"
 ZETL_TTL="$(date +%Y%m%d%H%M)"
 
@@ -35,6 +34,8 @@ ${bld}  -c | --clean${nml}
     remove empty files, prettify markdown, minify pngs
 ${bld}  -s | --sync${nml}
     pushes git commit of the Zettelkasten
+${bld}  -t | --today${nml}
+    open today's card in $EDITOR
 ${bld}  -b | --backup${nml}
     backup ${bld}$ZETL_DIR${nml} to ${bld}$BKUP_SRV${nml}
 ${bld}  -e | --emotion [1-5]${nml}
@@ -55,15 +56,24 @@ Examples:
 meta() {
   DATE_STR=$(date +"%d/%m/%y %H:%M")
   printf "%s---
-title:
-  - $TITLE
-date: $DATE_STR
-aliases:
-  - $TITLE
-tags:
-  - $TAGS
+title: \"$TITLE\"
+date: \"$DATE_STR\"
+aliases: \"$TITLE\"
+tags: \"$TAGS\"
 ---
 "
+}
+
+card_table() {
+  echo "| Category                | card count |"
+  echo "|-------------------------|------------|"
+  find Zettelkasten -maxdepth 1 -type d -iname "0*" | while read -r _dir; do
+      dir_name="$(echo "$_dir" | sed 's/_/ /' | sed 's/^Zettelkasten\///')"
+      card_count=$(find "$_dir" -iname "*.md" | wc -l)
+      echo -e "| $dir_name \t  | $card_count       |" >> .tmp
+  done
+  sort .tmp
+  rm .tmp
 }
 
 journal_template() {
@@ -71,39 +81,72 @@ journal_template() {
   TITLE=$JRNL_TTL
   META=$(meta "$TITLE" "$DATE_STR" "$TAGS")
   TOMORROW=$(date --date="tomorrow" +%y-%m-%d)
+  WEEKDAY=$(date +%A)
   printf "%s$META
 
-## $TITLE
+# $TITLE
 
-Day: $(date +%j)
+## $WEEKDAY
+
+_Day:_ $(date +%j)
 
 $(_weather_block "$_LOCATION")
 
 ### What Happened
 
 
-### Cards Since Yesterday
+### What have you achieved today
 
+### what did I learn today that can be applied tomorrow?
+
+### what are tomorrow's Priorities
+
+### what will make tomorrow easier?
+
+### What am I  looking forward to?
 $(_daily_exists)
 
 [Yesterday]($(_last_journal)) <-- --> [Tomorrow]($TOMORROW.md)"
 }
+
 daily_template() {
   PROMPT=$(_daily_prompt)
   TAGS="Daily"
   TITLE="$JRNL_TTL - DAILY"
   CARD_COUNT="$(_count_cards)"
-  META=$(meta)
+  MOTIVATE="$(/usr/local/bin/motivate --no-color)"
+  META="$(meta)"
   printf "%s$META
 
 # $TITLE
 
 *Card Count: $CARD_COUNT*
 
+$(card_table)
+
 ![tasks](__KANBAN.md)
 
-*\"$PROMPT\"*
+> *\"$PROMPT\"*
 
+
+## Weather-vane
+
+| Metric  | Rating  |
+|---------|---------|
+| Purpose |         |
+| Energy  |         |
+|         |         |
+
+## Priorities
+
+
+1. 
+2. 
+3. 
+
+---
+
+*$MOTIVATE*
 
 "
 }
@@ -161,7 +204,7 @@ _clean_filename() {
 }
 
 _populate_card() {
-  echo -e "$TEMPLATE" >"$1"
+  echo -e "$TEMPLATE" >>"$1"
 }
 
 _edit_card() {
@@ -191,11 +234,12 @@ _backup_zetl() {
 
 _minify_png() {
   _binary_exists pngquant
-  find . -iname "*.png" -exec pngquant {} --skip-if-larger --ext .png --force \;
+  find . -iname "*.png" -print0 | xargs -P 6 -n 1 -0 pngquant--skip-if-larger --ext .png --force \;
 }
 
 _minify_jpg() {
-  jpegoptim Zettelkasten/attachments/*.[jJ][pP]*[gG]
+    find .  \( -iname \*.jpg -or -iname \*.jpeg \) -print0 | xargs -P 6 -n 1 -0 jpegoptim --strip-all --all-progressive --max=80
+    
 }
 
 _clear_trash() {
@@ -274,7 +318,7 @@ _insert_task() {
   local insert_at
   insert_at="$(_find_kanban_list "$KNBN_BRD" "$KNBN_LST")"
   local task="$*"
-  sed -i "$insert_at"i\ "- [ ] $task" "$KNBN_BRD"
+    sed -i "${insert_at}i\ - [ ] $task $KNBN_BRD"
 }
 
 pushit() {
@@ -290,12 +334,24 @@ _github_sync() {
   [ "$out_of_sync" -ne 0 ] && pushit
 }
 
+_open_todays_card() {
+  # format= 2020-01-01.daily.md
+  # test for existence of file, if not, create it
+  local _CARD
+  _CARD="$JRNL_PTH$JRNL_TTL.daily.md"
+  if [ ! -f "$_CARD" ]; then
+    _populate_edit_format_card "$_CARD"
+  else
+    _edit_card "$_CARD"
+  fi
+}
+
 # =======================================================
 #     OPTION PARSING
 # =======================================================
 
-OPTIONS=bchde:nsjk
-LONGOPTS=backup,clean,help,daily,emotion,journal,new,sync,kanban
+OPTIONS=bchdet:nsjk
+LONGOPTS=backup,clean,help,daily,today,emotion,journal,new,sync,kanban
 ! PARSED=$(getopt --options=$OPTIONS --longoptions=$LONGOPTS --name "$0" -- "$@")
 
 if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
@@ -351,6 +407,10 @@ while true; do
       shift
       echo "sync called $(date)"
       _github_sync
+      ;;
+    -t | --today)
+      shift
+      _open_todays_card
       ;;
     -e | --emotion)
       _SENTIMENT="$2"
