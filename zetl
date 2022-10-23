@@ -292,18 +292,19 @@ _time_string() {
 }
 
 _emotion_check() {
-  # 1-5: angry to ecstatic
+  # 1-5: 1 = terrible, 5 = great
+  # emojis set in zetlrc
   emotion=${1:-}
   _time=$(_time_string)
   case $emotion in
-    1) emoji="😠" ;;
-    2) emoji="😟" ;;
-    3) emoji="😐" ;;
-    4) emoji="😊" ;;
-    5) emoji="😁" ;;
-    *) emoji="😐" ;;
+    1) emoji="$E1" ;;
+    2) emoji="$E2" ;;
+    3) emoji="$E3" ;;
+    4) emoji="$E4" ;;
+    5) emoji="$E5" ;;
+    *) emoji="$E3" ;;
   esac
-  echo -e "\\n$_time - $emoji"
+  echo -e "\\n🤔  $_time - $emoji"
 }
 
 _find_kanban_list() {

@@ -31,3 +31,11 @@ CARD_LNK="../__KANBAN"              ## link to a card refereced in daily templat
 # Kanban
 KNBN_BRD="$ZETL_DIR/__Kanban.md"    ## where's your Kanban Board?
 KNBN_LST="To-do Next"               ## which list should new cards go into?
+
+# Emotion Tracking [1=low, 5=high]
+E1="⛈️" 
+E2="🌧️" 
+E3="☁️" 
+E4="⛅" 
+E5="☀️"
+
