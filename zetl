@@ -307,6 +307,15 @@ _emotion_check() {
   echo -e "\\n🤔  $_time - $emoji"
 }
 
+_build_emotion_table() {
+  # test for ecistance of a line: | Time  | Emotion |
+  if ! grep -q "| Time  | Emotion |" "$1"; then
+    echo -e "| Time  | Emotion |" >>"$1"
+    echo -e "| ----- | ------- |" >>"$1"
+  fi
+}
+
+
 _find_kanban_list() {
   local board=${1:-}
   local list=${2:-}
@@ -394,7 +403,7 @@ while true; do
       TEMPLATE=$(new_template)
       _populate_edit_format_card "$CARD"
       ;;
-      -k | --kanban)
+    -k | --kanban)
       shift
       task="$*"
       task=${task#??}
@@ -418,6 +427,7 @@ while true; do
       emotion_string=$(_emotion_check "$_SENTIMENT")
       CARD="$JRNL_PTH$JRNL_TTL.daily.md"
       shift 2
+      _build_emotion_table "$CARD"
       echo "$emotion_string" >>"$CARD"
       ;;
     *)
