@@ -1,0 +1,19 @@
+# sample crontab showing example use-cases
+# most functons assume you want to edit the file; 
+# comment out the _edit_card line in _populate_edit_format_card function if 
+# you want to just create the file/s (will be fixed in future)
+
+ZETTELKASTEN_DIRECTORY="$HOME/zettelkasten"                                                                           
+                                                                                                              
+# m     h  dom mon dow      command                                                                                  
+
+# sync zettelkasten every half-hour                                                                                 
+0,30    *   *   *   *       cd "$ZETTELKASTEN_DIRECTORY"; ./z -s           >> .z.log                           
+# create a daily note every day at 07:00
+0       7   *   *   *       cd "$ZETTELKASTEN_DIRECTORY"; ./z -d           >> .z.log
+# create a journal note every dat at midday for a known location (Preston)                           
+0      12   *   *   *       cd "$ZETTELKASTEN_DIRECTORY"; ./z -j "Preston" >> .z.log
+# back up zettelkasten on Sunday Night                          
+15     23   *   *   sun     cd "$ZETTELKASTEN_DIRECTORY"; ./z -b           >> .z.log   
+# cleanse the zettelkasten first thing Monday _AFTER BACKUP_                        
+05     00   *   *   mon     cd "$ZETTELKASTEN_DIRECTORY"; ./z -c           >> .z.log   
