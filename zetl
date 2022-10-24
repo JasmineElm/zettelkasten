@@ -304,7 +304,7 @@ _emotion_check() {
     5) emoji="$E5" ;;
     *) emoji="$E3" ;;
   esac
-  echo -e "\\n🤔  $_time - $emoji"
+  echo -e "| $_time | $emoji |"
 }
 
 _build_emotion_table() {
