@@ -68,6 +68,8 @@ card_table() {
   echo "| Category                | card count |"
   echo "|-------------------------|------------|"
   find Zettelkasten -maxdepth 1 -type d -iname "0*" | while read -r _dir; do
+      # TODO: the sed command should use a var from zetlrc instead of being
+      # hardcoded
       dir_name="$(echo "$_dir" | sed 's/_/ /' | sed 's/^Zettelkasten\///')"
       card_count=$(find "$_dir" -iname "*.md" | wc -l)
       echo -e "| $dir_name \t  | $card_count       |" >> .tmp
@@ -148,6 +150,9 @@ $(card_table)
 
 *$MOTIVATE*
 
+## On This Day
+
+$(_find_on_this_day)
 "
 }
 
@@ -219,7 +224,7 @@ _prettify_card() {
 _populate_edit_format_card() {
   local _CARD="$1"
   _populate_card "$_CARD"
-  _edit_card "$_CARD"
+  # _edit_card "$_CARD"
   _prettify_card "$_CARD"
 }
 
@@ -315,7 +320,6 @@ _build_emotion_table() {
   fi
 }
 
-
 _find_kanban_list() {
   local board=${1:-}
   local list=${2:-}
@@ -354,6 +358,19 @@ _open_todays_card() {
   else
     _edit_card "$_CARD"
   fi
+}
+
+_find_on_this_day() {
+  # find daily cards from this date in years past
+  # _YEARS_AGO variable set in zetlrc
+  local _DAILY_PATTERN
+  for year in $(seq "$_YEARS_AGO"); do
+    _DAILY_PATTERN=$(date -d "$year years ago" +"%y-%m-%d")
+    _CARD="$JRNL_PTH$_DAILY_PATTERN.daily.md"
+    if [ -f "$_CARD" ]; then
+      echo "[$_DAILY_PATTERN]($_CARD)"
+    fi
+  done
 }
 
 # =======================================================

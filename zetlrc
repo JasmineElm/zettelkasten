@@ -11,9 +11,7 @@ WRTE_DIR="$ZETL_DIR/03_Writing_Inbox"
 CARD_DIR="$ZETL_DIR/04_Evergreen_Notes"
 POST_DIR="$ZETL_DIR/05_Speculative_Articles"
 
-
 JRNL_PTH="$ZETL_DIR/journals/"      ## directory for 'journal' cards
-WORK_DIR="$NOTE_DIR/__Work/"        ## directory for 'work' cards
 
 # Backup
 BKUP_SRV="google"                   ## backup to a service using rclone.
@@ -27,6 +25,7 @@ KEEP_FOR=14                         ## Files in $TRSH_DIR > this should be delet
 # Daily Information
 PROMPTS="prompts"                   ## reflective prompt file. 1 prompt per line
 CARD_LNK="../__KANBAN"              ## link to a card refereced in daily template
+_YEARS_AGO=5                        ## find daily cards on this day for prev years 
 
 # Kanban
 KNBN_BRD="$ZETL_DIR/__Kanban.md"    ## where's your Kanban Board?
